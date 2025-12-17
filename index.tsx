@@ -1,15 +1,9 @@
+// Note: The application logic has been bundled into index.html for direct local preview capabilities.
+// This file is kept for reference of the intended entry point structure if using a bundler.
+
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 
-const rootElement = document.getElementById('root');
-if (!rootElement) {
-  throw new Error("Could not find root element to mount to");
-}
-
-const root = ReactDOM.createRoot(rootElement);
-root.render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
+// In a real build environment, this would mount the app.
+// For the "Download and Preview" feature requested, index.html handles the mount directly.

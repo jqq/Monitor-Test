@@ -4,33 +4,1041 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>ContentMonitor Pro</title>
+    
+    <!-- 1. Styles -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
         theme: {
           extend: {
             colors: {
-              slate: {
-                850: '#1e293b', // Custom dark
-              }
+              slate: { 850: '#1e293b' }
             }
           }
+        },
+        corePlugins: {
+          preflight: false // Disable preflight to avoid conflict with Ant Design
         }
       }
     </script>
-  <script type="importmap">
+    <!-- Ant Design CSS -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/antd/5.15.0/reset.min.css" rel="stylesheet" />
+    
+    <!-- 2. UMD Libraries -->
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+    
+    <!-- Day.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.10/dayjs.min.js"></script>
+    
+    <!-- Ant Design -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/antd/5.15.0/antd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ant-design-icons/5.3.1/index.umd.min.js"></script>
+    
+    <!-- Prop Types (Required by Recharts UMD) -->
+    <script src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js"></script>
+    
+    <!-- Recharts (UMD via Unpkg is more reliable for globals) -->
+    <script src="https://unpkg.com/recharts@2.12.3/umd/Recharts.min.js"></script>
+
+    <!-- Babel for Runtime Compilation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.10/babel.min.js"></script>
+<script type="importmap">
 {
   "imports": {
-    "react/": "https://aistudiocdn.com/react@^19.2.1/",
-    "react": "https://aistudiocdn.com/react@^19.2.1",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/",
-    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.556.0",
-    "recharts": "https://aistudiocdn.com/recharts@^3.5.1"
+    "react": "https://esm.sh/react@^19.2.1",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.1/",
+    "lucide-react": "https://esm.sh/lucide-react@^0.559.0",
+    "react/": "https://esm.sh/react@^19.2.1/",
+    "recharts": "https://esm.sh/recharts@^3.5.1"
   }
 }
 </script>
 </head>
-  <body class="bg-slate-50 text-slate-900 antialiased selection:bg-blue-100 selection:text-blue-900">
+  <body class="bg-slate-50 text-slate-900">
     <div id="root"></div>
+
+    <!-- Application Code -->
+    <script type="text/babel">
+      const { useState, useEffect, useMemo } = React;
+      const { 
+        Layout, Menu, Button, Card, Statistic, Row, Col, 
+        Table, Tag, Input, Select, DatePicker, Modal, 
+        Form, Steps, Tabs, Badge, message, Drawer,
+        ConfigProvider, Avatar, Dropdown, Space, theme
+      } = antd;
+      
+      const { 
+        DashboardOutlined, FileTextOutlined, GlobalOutlined, 
+        TeamOutlined, BellOutlined, UserOutlined, 
+        TranslationOutlined, PlusOutlined, UploadOutlined,
+        PlayCircleOutlined, ReloadOutlined, CheckCircleOutlined,
+        ExclamationCircleOutlined, ArrowUpOutlined
+      } = icons; // Ant Design Icons global
+
+      // Safely access Recharts global
+      const RechartsObj = window.Recharts || {};
+      const { PieChart, Pie, Cell, Tooltip: RechartsTooltip, Legend, ResponsiveContainer } = RechartsObj;
+
+      if (!window.Recharts) {
+        console.error("Recharts failed to load. Please check your internet connection or CDN availability.");
+      }
+
+      // --- Locales ---
+      const translations = {
+        en: {
+          common: {
+            loading: "Loading...",
+            save: "Save",
+            cancel: "Cancel",
+            confirm: "Confirm",
+            back: "Back",
+            next: "Next",
+            edit: "Edit",
+            delete: "Delete",
+            search: "Search",
+            actions: "Actions",
+            status: "Status",
+            date: "Date",
+            yes: "Yes",
+            no: "No",
+          },
+          enums: {
+            contentType: {
+              Recruitment: "Recruitment",
+              Notice: "Notice",
+              News: "News",
+              Tender: "Tender"
+            },
+            contentStatus: {
+              Published: "Published",
+              Draft: "Draft",
+              Archived: "Archived"
+            },
+            crawlerStatus: {
+              Normal: "Normal",
+              Failed: "Failed",
+              Pending: "Pending"
+            }
+          },
+          nav: {
+            dashboard: "Dashboard",
+            content: "Content Hub",
+            crawlers: "Monitors",
+            users: "Team",
+            systemOp: "System Operational",
+          },
+          header: {
+            org: "Organization",
+            orgName: "Universe Master Corp",
+            admin: "Administrator",
+            role: "Super User",
+          },
+          dashboard: {
+            title: "Dashboard",
+            subtitle: "Overview of system performance and data metrics.",
+            newToday: "New Today",
+            fromYesterday: "+12% from yesterday",
+            totalContent: "Total Content",
+            historical: "Historical accumulated",
+            monitorAbnormal: "Monitor Abnormalities",
+            actionRequired: "Action required immediately",
+            allNormal: "All systems normal",
+            catChart: "Content by Category (7 Days)",
+            sourceChart: "Top Sources (7 Days)",
+            viewSource: "View source"
+          },
+          content: {
+            title: "Content Management",
+            subtitle: "Review, edit, and publish gathered intelligence.",
+            searchPlaceholder: "Search title or source...",
+            allTypes: "All Types",
+            showing: "Showing",
+            records: "records",
+            cols: {
+              title: "Title",
+              source: "Source",
+              type: "Type",
+              date: "Date",
+              status: "Status",
+              actions: "Actions",
+            },
+            details: "Details",
+            backToList: "Back to List",
+            reviewing: "Reviewing",
+            saveChanges: "Save Changes",
+            prev: "Previous",
+            next: "Next",
+            originalSnapshot: "Original Page Snapshot",
+            previewNote: "Interactive preview not available in prototype.",
+            form: {
+              title: "Title",
+              publishDate: "Publish Date",
+              status: "Status",
+              category: "Category",
+              region: "Region",
+              body: "Content Body (Markdown)",
+            }
+          },
+          crawlers: {
+            title: "Monitor Configuration",
+            subtitle: "Manage crawler targets and extraction rules.",
+            tabs: {
+              all: "All",
+              normal: "Normal",
+              failed: "Failed",
+              pending: "Pending"
+            },
+            import: "Import Excel",
+            add: "Add Monitor",
+            freq: "Freq",
+            last: "Last",
+            runNow: "Run Now",
+            failReason: "Connection timed out",
+            wizard: {
+              title: "Configure New Monitor",
+              step1: "Basic Information",
+              step2: "Extraction Rules",
+              siteName: "Site Name",
+              siteNamePlaceholder: "e.g., City HR Bureau",
+              entryUrl: "Entry URL",
+              testConn: "Test Connection",
+              connSuccess: "Connection Successful",
+              connFail: "Connection Failed. Check URL.",
+              frequency: "Frequency",
+              freqOptions: {
+                "1h": "Every Hour",
+                "6h": "Every 6 Hours",
+                "24h": "Daily"
+              },
+              listSelector: "List Item Selector",
+              bodySelector: "Content Body Selector",
+              testRules: "Test Rules",
+              nextStep: "Next Step",
+              confirmCreate: "Confirm & Create",
+              previewTitle: "Mocked Scraped Title 2024",
+              previewText: "This is a preview of the scraped text content..."
+            }
+          },
+          users: {
+            title: "User Management",
+            subtitle: "Manage team access and verify personnel via EHR.",
+            systemUsers: "System Users",
+            add: "Add User",
+            cols: {
+              name: "Name",
+              phone: "Phone",
+              role: "Role",
+              joined: "Joined Date",
+              status: "Status",
+            },
+            active: "Active",
+            modal: {
+              title: "Add New Operator",
+              verifyBtn: "Verify & Add",
+              note: "Note: Users are verified against the central EHR system using their phone number.",
+              fullName: "Full Name",
+              phone: "Phone Number",
+              error: "EHR Check Failed: Employee not found or inactive."
+            }
+          }
+        },
+        zh: {
+          common: {
+            loading: "加载中...",
+            save: "保存",
+            cancel: "取消",
+            confirm: "确认",
+            back: "返回",
+            next: "下一步",
+            edit: "编辑",
+            delete: "删除",
+            search: "搜索",
+            actions: "操作",
+            status: "状态",
+            date: "日期",
+            yes: "是",
+            no: "否",
+          },
+          enums: {
+            contentType: {
+              Recruitment: "招聘公告",
+              Notice: "通知公示",
+              News: "新闻资讯",
+              Tender: "招标采购"
+            },
+            contentStatus: {
+              Published: "已发布",
+              Draft: "草稿",
+              Archived: "已归档"
+            },
+            crawlerStatus: {
+              Normal: "运行正常",
+              Failed: "运行失败",
+              Pending: "待启用"
+            }
+          },
+          nav: {
+            dashboard: "数据看板",
+            content: "内容管理",
+            crawlers: "监测管理",
+            users: "用户管理",
+            systemOp: "系统运行正常",
+          },
+          header: {
+            org: "所属组织",
+            orgName: "宇宙大师公司",
+            admin: "管理员",
+            role: "超级用户",
+          },
+          dashboard: {
+            title: "数据看板",
+            subtitle: "系统运行状况与核心指标概览。",
+            newToday: "今日新增",
+            fromYesterday: "较昨日 +12%",
+            totalContent: "历史总数",
+            historical: "历史累计采集",
+            monitorAbnormal: "监测源异常",
+            actionRequired: "需立即处理",
+            allNormal: "所有系统运行正常",
+            catChart: "近7日资讯分类统计",
+            sourceChart: "近7日来源 TOP5",
+            viewSource: "查看来源"
+          },
+          content: {
+            title: "内容管理",
+            subtitle: "审核、编辑及发布采集到的情报资讯。",
+            searchPlaceholder: "搜索标题或来源...",
+            allTypes: "所有类型",
+            showing: "显示",
+            records: "条记录",
+            cols: {
+              title: "标题",
+              source: "来源",
+              type: "类型",
+              date: "发布时间",
+              status: "状态",
+              actions: "操作",
+            },
+            details: "详情",
+            backToList: "返回列表",
+            reviewing: "正在审核",
+            saveChanges: "保存修改",
+            prev: "上一篇",
+            next: "下一篇",
+            originalSnapshot: "原始网页快照",
+            previewNote: "原型中暂不支持交互预览。",
+            form: {
+              title: "标题",
+              publishDate: "发布时间",
+              status: "状态",
+              category: "资讯分类",
+              region: "所属地区",
+              body: "正文内容 (Markdown)",
+            }
+          },
+          crawlers: {
+            title: "监测配置管理",
+            subtitle: "管理爬虫采集目标及数据提取规则。",
+            tabs: {
+              all: "全部",
+              normal: "运行正常",
+              failed: "运行失败",
+              pending: "待启用"
+            },
+            import: "导入 Excel",
+            add: "新增监测",
+            freq: "频率",
+            last: "上次运行",
+            runNow: "立即运行",
+            failReason: "连接超时 (504)",
+            wizard: {
+              title: "配置新监测源",
+              step1: "基本信息",
+              step2: "提取规则配置",
+              siteName: "站点名称",
+              siteNamePlaceholder: "例如：市人社局官网",
+              entryUrl: "入口 URL",
+              testConn: "连接测试",
+              connSuccess: "连接成功",
+              connFail: "连接失败，请检查 URL",
+              frequency: "采集频率",
+              freqOptions: {
+                "1h": "每小时",
+                "6h": "每6小时",
+                "24h": "每天"
+              },
+              listSelector: "列表项选择器",
+              bodySelector: "正文选择器",
+              testRules: "规则测试",
+              nextStep: "下一步",
+              confirmCreate: "确认并创建",
+              previewTitle: "模拟抓取标题 2024",
+              previewText: "这是抓取到的正文内容预览..."
+            }
+          },
+          users: {
+            title: "用户管理",
+            subtitle: "管理团队权限并通过 EHR 系统验证人员。",
+            systemUsers: "系统用户列表",
+            add: "新增用户",
+            cols: {
+              name: "姓名",
+              phone: "手机号",
+              role: "角色",
+              joined: "加入时间",
+              status: "状态",
+            },
+            active: "正常",
+            modal: {
+              title: "新增操作员",
+              verifyBtn: "验证并添加",
+              note: "注意：用户将通过手机号在中央 EHR 系统中进行验证。",
+              fullName: "姓名",
+              phone: "手机号",
+              error: "EHR 验证失败：员工不存在或已离职。"
+            }
+          }
+        }
+      };
+
+      // --- Types (Mocked as Constants/Enums) ---
+      const ContentType = {
+        RECRUITMENT: 'Recruitment',
+        NOTICE: 'Notice',
+        NEWS: 'News',
+        TENDER: 'Tender'
+      };
+
+      const ContentStatus = {
+        PUBLISHED: 'Published',
+        DRAFT: 'Draft',
+        ARCHIVED: 'Archived'
+      };
+
+      const CrawlerStatus = {
+        NORMAL: 'Normal',
+        FAILED: 'Failed',
+        PENDING: 'Pending'
+      };
+
+      // --- Components ---
+
+      // 1. Dashboard Component
+      const Dashboard = ({ contents, crawlers, t }) => {
+        const today = new Date().toISOString().split('T')[0];
+        const newToday = contents.filter(c => c.publishDate.startsWith(today)).length;
+        const totalCount = contents.length;
+        const abnormalCrawlers = crawlers.filter(c => c.status === CrawlerStatus.FAILED).length;
+
+        const typeCount = contents.reduce((acc, curr) => {
+            const typeKey = curr.type; 
+            acc[typeKey] = (acc[typeKey] || 0) + 1;
+            return acc;
+        }, {});
+
+        const pieData = Object.keys(typeCount).map(key => ({
+            name: t.enums.contentType[key] || key,
+            value: typeCount[key]
+        }));
+
+        const COLORS = ['#1677ff', '#69b1ff', '#91caff', '#bae0ff'];
+
+        const sourceCount = contents.reduce((acc, curr) => {
+            acc[curr.source] = (acc[curr.source] || 0) + 1;
+            return acc;
+        }, {});
+        
+        const topSources = Object.entries(sourceCount)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 5)
+            .map(([name, count]) => ({ name, count }));
+
+        return (
+          <div className="space-y-6">
+            <Row gutter={16}>
+              <Col span={8}>
+                <Card bordered={false} hoverable>
+                  <Statistic 
+                    title={t.dashboard.newToday} 
+                    value={newToday} 
+                    prefix={<FileTextOutlined style={{color: '#1677ff'}}/>} 
+                    suffix={<span className="text-xs text-green-500 ml-2"><ArrowUpOutlined /> 12%</span>}
+                  />
+                </Card>
+              </Col>
+              <Col span={8}>
+                <Card bordered={false} hoverable>
+                  <Statistic 
+                    title={t.dashboard.totalContent} 
+                    value={totalCount} 
+                    groupSeparator=","
+                    prefix={<DashboardOutlined />}
+                  />
+                </Card>
+              </Col>
+              <Col span={8}>
+                <Card bordered={false} hoverable className={abnormalCrawlers > 0 ? "bg-red-50 border-red-100" : ""}>
+                  <Statistic 
+                    title={<span className={abnormalCrawlers > 0 ? "text-red-600" : ""}>{t.dashboard.monitorAbnormal}</span>} 
+                    value={abnormalCrawlers} 
+                    prefix={<ExclamationCircleOutlined className={abnormalCrawlers > 0 ? "text-red-600" : "text-gray-400"} />}
+                    valueStyle={abnormalCrawlers > 0 ? {color: '#cf1322'} : {}}
+                  />
+                  <div className="text-xs mt-2 text-gray-500">{abnormalCrawlers > 0 ? t.dashboard.actionRequired : t.dashboard.allNormal}</div>
+                </Card>
+              </Col>
+            </Row>
+
+            <Row gutter={16}>
+              <Col span={12}>
+                <Card title={t.dashboard.catChart} bordered={false}>
+                  <div style={{ width: '100%', height: 300 }}>
+                    {/* Ensure ResponsiveContainer is rendered only if Recharts loaded */}
+                    {ResponsiveContainer ? (
+                      <ResponsiveContainer>
+                          <PieChart>
+                              <Pie
+                                  data={pieData}
+                                  cx="50%"
+                                  cy="50%"
+                                  innerRadius={60}
+                                  outerRadius={80}
+                                  paddingAngle={5}
+                                  dataKey="value"
+                              >
+                                  {pieData.map((entry, index) => (
+                                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                  ))}
+                              </Pie>
+                              <RechartsTooltip />
+                              <Legend verticalAlign="bottom" height={36}/>
+                          </PieChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="flex items-center justify-center h-full text-red-500">
+                        Chart library failed to load
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              </Col>
+              <Col span={12}>
+                <Card title={t.dashboard.sourceChart} bordered={false}>
+                  <div className="space-y-4 pt-4">
+                    {topSources.map((source, index) => (
+                        <div key={index} className="flex items-center justify-between p-2 hover:bg-slate-50 rounded transition-colors">
+                            <div className="flex items-center gap-3">
+                                <Avatar style={{ backgroundColor: index < 3 ? '#1677ff' : '#f0f0f0', color: index < 3 ? 'white' : 'black' }} size="small">
+                                  {index + 1}
+                                </Avatar>
+                                <div>
+                                    <p className="font-medium m-0 text-slate-800">{source.name}</p>
+                                </div>
+                            </div>
+                            <span className="font-bold text-slate-600">{source.count}</span>
+                        </div>
+                    ))}
+                  </div>
+                </Card>
+              </Col>
+            </Row>
+          </div>
+        );
+      };
+
+      // 2. Content Manager Component
+      const ContentManager = ({ data, onUpdate, t }) => {
+        const [searchTerm, setSearchTerm] = useState('');
+        const [selectedItem, setSelectedItem] = useState(null);
+        const [form] = Form.useForm();
+        const [drawerVisible, setDrawerVisible] = useState(false);
+
+        const filteredData = data.filter(item => 
+            item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            item.source.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+
+        const handleOpenDetail = (item) => {
+            setSelectedItem(item);
+            form.setFieldsValue({
+              ...item,
+              publishDate: dayjs(item.publishDate)
+            });
+            setDrawerVisible(true);
+        };
+
+        const handleCloseDetail = () => {
+            setDrawerVisible(false);
+            setSelectedItem(null);
+            form.resetFields();
+        };
+
+        const handleSave = () => {
+             form.validateFields().then(values => {
+                const updated = {
+                  ...selectedItem,
+                  ...values,
+                  publishDate: values.publishDate.format('YYYY-MM-DD')
+                };
+                onUpdate(updated);
+                message.success("Saved successfully");
+                setSelectedItem(updated); // Update local selected state
+             });
+        };
+
+        const columns = [
+          { title: t.content.cols.title, dataIndex: 'title', key: 'title', ellipsis: true },
+          { title: t.content.cols.source, dataIndex: 'source', key: 'source' },
+          { 
+            title: t.content.cols.type, 
+            dataIndex: 'type', 
+            key: 'type',
+            render: (type) => <Tag>{t.enums.contentType[type]}</Tag>
+          },
+          { title: t.content.cols.date, dataIndex: 'publishDate', key: 'publishDate' },
+          { 
+            title: t.content.cols.status, 
+            dataIndex: 'status', 
+            key: 'status',
+            render: (status) => {
+              let color = 'default';
+              if(status === ContentStatus.PUBLISHED) color = 'success';
+              if(status === ContentStatus.DRAFT) color = 'warning';
+              return <Badge status={color} text={t.enums.contentStatus[status]} />;
+            }
+          },
+          {
+            title: t.content.cols.actions,
+            key: 'action',
+            render: (_, record) => (
+              <Button type="link" size="small" onClick={() => handleOpenDetail(record)}>
+                {t.content.details}
+              </Button>
+            ),
+          },
+        ];
+
+        return (
+          <div className="space-y-4">
+            <Card bordered={false}>
+              <Space className="mb-4">
+                <Input.Search 
+                  placeholder={t.content.searchPlaceholder} 
+                  style={{ width: 300 }} 
+                  onSearch={v => setSearchTerm(v)}
+                  onChange={e => setSearchTerm(e.target.value)}
+                  allowClear
+                />
+                <Select defaultValue="" style={{ width: 150 }} onChange={() => {}}>
+                  <Select.Option value="">{t.content.allTypes}</Select.Option>
+                  {Object.values(ContentType).map(k => (
+                    <Select.Option key={k} value={k}>{t.enums.contentType[k]}</Select.Option>
+                  ))}
+                </Select>
+              </Space>
+              
+              <Table 
+                columns={columns} 
+                dataSource={filteredData} 
+                rowKey="id" 
+                pagination={{ pageSize: 8 }}
+              />
+            </Card>
+
+            <Drawer
+              title={`${t.content.reviewing}: ${selectedItem?.id || ''}`}
+              placement="right"
+              width="100%"
+              onClose={handleCloseDetail}
+              open={drawerVisible}
+              extra={
+                <Space>
+                  <Button onClick={handleCloseDetail}>{t.common.cancel}</Button>
+                  <Button type="primary" onClick={handleSave}>{t.content.saveChanges}</Button>
+                </Space>
+              }
+            >
+              <div className="flex h-full gap-6">
+                 {/* Left: Snapshot Placeholder */}
+                 <div className="w-1/2 bg-gray-100 rounded-lg border border-gray-200 flex flex-col p-4">
+                    <div className="bg-white p-2 rounded border mb-4 text-xs text-gray-500 truncate">
+                      {selectedItem?.sourceUrl}
+                    </div>
+                    <div className="flex-1 flex items-center justify-center text-center">
+                       <div>
+                         <GlobalOutlined style={{ fontSize: 48, color: '#ccc' }} />
+                         <p className="text-gray-400 mt-2">{t.content.originalSnapshot}</p>
+                       </div>
+                    </div>
+                 </div>
+
+                 {/* Right: Form */}
+                 <div className="w-1/2 overflow-y-auto pr-2">
+                    <Form form={form} layout="vertical">
+                      <Form.Item name="title" label={t.content.form.title} rules={[{required: true}]}>
+                        <Input />
+                      </Form.Item>
+                      <Row gutter={16}>
+                        <Col span={12}>
+                          <Form.Item name="publishDate" label={t.content.form.publishDate}>
+                            <DatePicker style={{ width: '100%' }} />
+                          </Form.Item>
+                        </Col>
+                        <Col span={12}>
+                           <Form.Item name="status" label={t.content.form.status}>
+                             <Select>
+                                {Object.values(ContentStatus).map(s => (
+                                  <Select.Option key={s} value={s}>{t.enums.contentStatus[s]}</Select.Option>
+                                ))}
+                             </Select>
+                           </Form.Item>
+                        </Col>
+                      </Row>
+                      <Row gutter={16}>
+                        <Col span={12}>
+                          <Form.Item name="type" label={t.content.form.category}>
+                             <Select>
+                                {Object.values(ContentType).map(s => (
+                                  <Select.Option key={s} value={s}>{t.enums.contentType[s]}</Select.Option>
+                                ))}
+                             </Select>
+                          </Form.Item>
+                        </Col>
+                        <Col span={12}>
+                           <Form.Item name="region" label={t.content.form.region}>
+                             <Select>
+                               <Select.Option value="New York">New York</Select.Option>
+                               <Select.Option value="London">London</Select.Option>
+                               <Select.Option value="Singapore">Singapore</Select.Option>
+                             </Select>
+                           </Form.Item>
+                        </Col>
+                      </Row>
+                      <Form.Item name="body" label={t.content.form.body}>
+                        <Input.TextArea rows={15} showCount />
+                      </Form.Item>
+                    </Form>
+                 </div>
+              </div>
+            </Drawer>
+          </div>
+        );
+      };
+
+      // 3. Crawler Manager Component
+      const CrawlerManager = ({ crawlers, onAdd, onImport, t }) => {
+        const [isModalOpen, setIsModalOpen] = useState(false);
+        const [currentStep, setCurrentStep] = useState(0);
+        const [form] = Form.useForm();
+        const [testing, setTesting] = useState(false);
+        const [testResult, setTestResult] = useState(null);
+
+        const items = [
+            { key: 'All', label: t.crawlers.tabs.all },
+            { key: 'Normal', label: t.crawlers.tabs.normal },
+            { key: 'Failed', label: t.crawlers.tabs.failed },
+            { key: 'Pending', label: t.crawlers.tabs.pending },
+        ];
+
+        const handleTestConnection = () => {
+           setTesting(true);
+           setTimeout(() => {
+              setTesting(false);
+              setTestResult('success');
+              message.success(t.crawlers.wizard.connSuccess);
+           }, 1000);
+        };
+
+        const finish = () => {
+            form.validateFields().then(values => {
+                 onAdd({
+                    id: `job-${Date.now()}`,
+                    name: values.name,
+                    entryUrl: values.entryUrl,
+                    frequency: values.frequency,
+                    lastRun: 'Never',
+                    status: CrawlerStatus.NORMAL
+                 });
+                 setIsModalOpen(false);
+                 form.resetFields();
+                 setCurrentStep(0);
+                 setTestResult(null);
+            });
+        };
+
+        return (
+          <div className="space-y-6">
+             <div className="flex justify-between items-center bg-white p-4 rounded-lg border border-slate-200">
+                <Tabs defaultActiveKey="All" items={items} style={{ marginBottom: -16 }} />
+                <Space>
+                   <Button icon={<UploadOutlined />} onClick={onImport}>{t.crawlers.import}</Button>
+                   <Button type="primary" icon={<PlusOutlined />} onClick={() => setIsModalOpen(true)}>{t.crawlers.add}</Button>
+                </Space>
+             </div>
+
+             <Row gutter={[16, 16]}>
+                {crawlers.map(c => (
+                  <Col xs={24} md={12} lg={8} key={c.id}>
+                    <Card actions={[
+                       <span key="edit">{t.common.edit}</span>,
+                       <span key="run" style={{color: '#1677ff'}}>{t.crawlers.runNow}</span>
+                    ]}>
+                       <Card.Meta
+                          avatar={<Avatar style={{ backgroundColor: '#1677ff' }}>C</Avatar>}
+                          title={<div className="flex justify-between">
+                             <span className="truncate max-w-[120px]">{c.name}</span>
+                             <Tag color={c.status === CrawlerStatus.NORMAL ? 'success' : c.status === CrawlerStatus.FAILED ? 'error' : 'default'}>
+                                {t.enums.crawlerStatus[c.status]}
+                             </Tag>
+                          </div>}
+                          description={
+                            <div className="text-xs space-y-1 mt-2">
+                               <p className="truncate m-0">URL: {c.entryUrl}</p>
+                               <div className="flex justify-between text-gray-400">
+                                  <span>{t.crawlers.freq}: {c.frequency}</span>
+                                  <span>{t.crawlers.last}: {c.lastRun}</span>
+                               </div>
+                               {c.status === CrawlerStatus.FAILED && (
+                                 <div className="text-red-500 bg-red-50 p-1 rounded mt-1">
+                                    {t.crawlers.failReason}
+                                 </div>
+                               )}
+                            </div>
+                          }
+                       />
+                    </Card>
+                  </Col>
+                ))}
+             </Row>
+
+             <Modal 
+               open={isModalOpen} 
+               onCancel={() => setIsModalOpen(false)}
+               title={t.crawlers.wizard.title}
+               width={700}
+               footer={null}
+             >
+                <Steps current={currentStep} items={[
+                    { title: t.crawlers.wizard.step1 },
+                    { title: t.crawlers.wizard.step2 }
+                ]} className="mb-8" />
+
+                <Form form={form} layout="vertical">
+                    {currentStep === 0 && (
+                        <>
+                           <Form.Item name="name" label={t.crawlers.wizard.siteName} rules={[{required: true}]}>
+                             <Input placeholder={t.crawlers.wizard.siteNamePlaceholder} />
+                           </Form.Item>
+                           <Form.Item label={t.crawlers.wizard.entryUrl} required>
+                             <Space.Compact style={{ width: '100%' }}>
+                                <Form.Item name="entryUrl" noStyle rules={[{required: true}]}>
+                                    <Input placeholder="https://..." />
+                                </Form.Item>
+                                <Button onClick={handleTestConnection} loading={testing}>
+                                    {t.crawlers.wizard.testConn}
+                                </Button>
+                             </Space.Compact>
+                             {testResult === 'success' && <div className="text-green-500 mt-1">{t.crawlers.wizard.connSuccess}</div>}
+                           </Form.Item>
+                           <Form.Item name="frequency" label={t.crawlers.wizard.frequency} initialValue="24h">
+                              <Select>
+                                 <Select.Option value="1h">1H</Select.Option>
+                                 <Select.Option value="24h">24H</Select.Option>
+                              </Select>
+                           </Form.Item>
+                           <div className="flex justify-end">
+                              <Button type="primary" onClick={() => setCurrentStep(1)} disabled={testResult !== 'success'}>
+                                 {t.common.next}
+                              </Button>
+                           </div>
+                        </>
+                    )}
+
+                    {currentStep === 1 && (
+                        <>
+                           <Form.Item name="listSelector" label={t.crawlers.wizard.listSelector}>
+                              <Input placeholder=".news-list > li" />
+                           </Form.Item>
+                           <Form.Item name="detailSelector" label={t.crawlers.wizard.bodySelector}>
+                              <Input placeholder="#article-content" />
+                           </Form.Item>
+                           <div className="bg-gray-50 p-4 rounded mb-4 border border-gray-200">
+                               <p className="font-bold text-gray-700">{t.crawlers.wizard.previewTitle}</p>
+                               <p className="text-gray-500 text-sm">2024-05-21</p>
+                               <p className="italic text-gray-600 border-l-2 border-blue-400 pl-2 mt-2">{t.crawlers.wizard.previewText}</p>
+                           </div>
+                           <div className="flex justify-between">
+                              <Button onClick={() => setCurrentStep(0)}>{t.common.back}</Button>
+                              <Button type="primary" onClick={finish}>{t.crawlers.wizard.confirmCreate}</Button>
+                           </div>
+                        </>
+                    )}
+                </Form>
+             </Modal>
+          </div>
+        );
+      };
+
+      // 4. User Manager Component
+      const UserManager = ({ users, onAdd, t }) => {
+         const [isModalOpen, setIsModalOpen] = useState(false);
+         const [loading, setLoading] = useState(false);
+         const [form] = Form.useForm();
+
+         const handleOk = () => {
+             form.validateFields().then(values => {
+                 setLoading(true);
+                 setTimeout(() => {
+                     if(values.phone.endsWith('00')) {
+                        message.error(t.users.modal.error);
+                        setLoading(false);
+                        return;
+                     }
+                     onAdd({
+                        id: `u-${Date.now()}`,
+                        username: values.username,
+                        phone: values.phone,
+                        role: 'Operator',
+                        addedAt: new Date().toISOString().split('T')[0]
+                     });
+                     setLoading(false);
+                     setIsModalOpen(false);
+                     form.resetFields();
+                 }, 1000);
+             });
+         };
+
+         const columns = [
+            { title: t.users.cols.name, dataIndex: 'username', key: 'name' },
+            { title: t.users.cols.phone, dataIndex: 'phone', key: 'phone' },
+            { title: t.users.cols.role, dataIndex: 'role', key: 'role', render: (text) => <Tag color="blue">{text}</Tag> },
+            { title: t.users.cols.joined, dataIndex: 'addedAt', key: 'joined' },
+            { title: t.users.cols.status, key: 'status', render: () => <Badge status="success" text={t.users.active} /> },
+         ];
+
+         return (
+            <div className="space-y-4">
+                <div className="flex justify-end">
+                    <Button type="primary" icon={<UserOutlined />} onClick={() => setIsModalOpen(true)}>
+                        {t.users.add}
+                    </Button>
+                </div>
+                <Table dataSource={users} columns={columns} rowKey="id" />
+
+                <Modal
+                   title={t.users.modal.title}
+                   open={isModalOpen}
+                   onOk={handleOk}
+                   confirmLoading={loading}
+                   onCancel={() => setIsModalOpen(false)}
+                   okText={t.users.modal.verifyBtn}
+                   cancelText={t.common.cancel}
+                >
+                    <div className="bg-blue-50 text-blue-600 p-3 rounded mb-4 border border-blue-100 text-xs">
+                        {t.users.modal.note}
+                    </div>
+                    <Form form={form} layout="vertical">
+                        <Form.Item name="username" label={t.users.modal.fullName} rules={[{required: true}]}>
+                            <Input prefix={<UserOutlined />} />
+                        </Form.Item>
+                        <Form.Item name="phone" label={t.users.modal.phone} rules={[{required: true}]}>
+                            <Input prefix={<TeamOutlined />} />
+                        </Form.Item>
+                    </Form>
+                </Modal>
+            </div>
+         );
+      };
+
+      // 5. Main App Component
+      const App = () => {
+        const { Header, Sider, Content } = Layout;
+        const [collapsed, setCollapsed] = useState(false);
+        const [view, setView] = useState('dashboard');
+        const [lang, setLang] = useState('zh');
+        
+        // Mock Data State
+        const [contents, setContents] = useState([
+            { id: '1', title: 'Senior React Developer Recruitment', source: 'Tech Daily', sourceUrl: 'https://techdaily.com/job/1', publishDate: '2024-05-20', type: ContentType.RECRUITMENT, region: 'New York', status: ContentStatus.PUBLISHED, body: 'Job description placeholder...' },
+            { id: '2', title: 'Public Tender for City Park Renovation', source: 'Gov Portal', sourceUrl: 'https://gov.city/tender/99', publishDate: '2024-05-19', type: ContentType.TENDER, region: 'London', status: ContentStatus.DRAFT, body: 'Details here...' },
+        ]);
+        const [crawlers, setCrawlers] = useState([
+            { id: 'c1', name: 'City Govt Portal', entryUrl: 'https://city.gov/news', frequency: '1h', lastRun: '10 mins ago', status: CrawlerStatus.NORMAL },
+            { id: 'c2', name: 'Tech Crunch Feed', entryUrl: 'https://tc.com/feed', frequency: '24h', lastRun: '1 day ago', status: CrawlerStatus.FAILED, failReason: 'Timeout 504' },
+        ]);
+        const [users, setUsers] = useState([
+            { id: 'u1', username: 'Admin User', phone: '13812345678', role: 'Administrator', addedAt: '2023-01-15' },
+        ]);
+
+        const t = translations[lang];
+
+        const menuItems = [
+            { key: 'dashboard', icon: <DashboardOutlined />, label: t.nav.dashboard },
+            { key: 'content', icon: <FileTextOutlined />, label: t.nav.content },
+            { key: 'crawlers', icon: <GlobalOutlined />, label: t.nav.crawlers },
+            { key: 'users', icon: <TeamOutlined />, label: t.nav.users },
+        ];
+
+        return (
+          <ConfigProvider
+             theme={{
+                token: {
+                    colorPrimary: '#1677ff',
+                    borderRadius: 6,
+                },
+             }}
+          >
+            <Layout style={{ minHeight: '100vh' }}>
+                <Sider collapsible collapsed={collapsed} onCollapse={setCollapsed} theme="dark" width={240}>
+                    <div className="h-16 flex items-center justify-center m-2 bg-white/10 rounded">
+                        <span className="text-white font-bold text-lg tracking-wider">
+                           {collapsed ? 'CM' : 'ContentPro'}
+                        </span>
+                    </div>
+                    <Menu 
+                       theme="dark" 
+                       defaultSelectedKeys={['dashboard']} 
+                       mode="inline" 
+                       items={menuItems} 
+                       onClick={(e) => setView(e.key)}
+                    />
+                </Sider>
+                <Layout>
+                    <Header style={{ padding: '0 24px', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.03)' }}>
+                        <div>
+                             <h2 className="text-lg font-semibold m-0">{t.header.org}: <span className="text-blue-600">{t.header.orgName}</span></h2>
+                        </div>
+                        <Space size="large">
+                            <Button icon={<TranslationOutlined />} type="text" onClick={() => setLang(l => l === 'en' ? 'zh' : 'en')}>
+                                {lang === 'en' ? '中文' : 'English'}
+                            </Button>
+                            <Badge count={5} size="small">
+                                <Button icon={<BellOutlined />} shape="circle" />
+                            </Badge>
+                            <Space>
+                                <Avatar style={{ backgroundColor: '#87d068' }} icon={<UserOutlined />} />
+                                <span className="text-sm font-medium hidden md:inline">{t.header.admin}</span>
+                            </Space>
+                        </Space>
+                    </Header>
+                    <Content style={{ margin: '24px 16px', padding: 24, minHeight: 280, background: '#f8fafc', overflowY: 'auto' }}>
+                        <div className="max-w-7xl mx-auto">
+                            {view === 'dashboard' && <Dashboard contents={contents} crawlers={crawlers} t={t} />}
+                            {view === 'content' && <ContentManager data={contents} onUpdate={(u) => setContents(p => p.map(i => i.id === u.id ? u : i))} t={t} />}
+                            {view === 'crawlers' && <CrawlerManager crawlers={crawlers} onAdd={(c) => setCrawlers([c, ...crawlers])} onImport={() => message.info('Mock Import')} t={t} />}
+                            {view === 'users' && <UserManager users={users} onAdd={(u) => setUsers([u, ...users])} t={t} />}
+                        </div>
+                    </Content>
+                </Layout>
+            </Layout>
+          </ConfigProvider>
+        );
+      };
+
+      const root = ReactDOM.createRoot(document.getElementById('root'));
+      root.render(<App />);
+    </script>
   </body>
 </html>
